@@ -27,18 +27,12 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 # ⚙️ CONFIGURATION (แก้ตรงนี้ หรือจะตั้งผ่าน environment variable ก็ได้)
 # ============================================================
 
-LINE_CHANNEL_ACCESS_TOKEN = os.environ.get(
-    "LINE_CHANNEL_ACCESS_TOKEN",
-    "cgTWaHGdOoyTc1a1fF9O2vRKyswwcfeT51xD3SDGIyZCQDMCgxhWYqC9OPSPqOaB4tO+l5eIf0eDfZ/jxp1rPTYng/kBO3Mb6izxRxd1xqPUTHiwhdGqE0h1lR6cbIOG6acshygU33CpoEvkcRkPTgdB04t89/1O/w1cDnyilFU=",
-)
-LINE_CHANNEL_SECRET = os.environ.get(
-    "LINE_CHANNEL_SECRET",
-    "0be217429b92f324572296d63430e052",
-)
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
+LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "")
 
 # ถ้าอยากจำกัดให้ใช้ได้เฉพาะ LINE user ID ของคุณ ใส่ user id ตรงนี้ (หาได้จาก event.source.user_id ที่ print ตอนทดสอบ)
 # ปล่อยเป็นสตริงว่าง "" = ไม่ล็อค ใครทักมาก็ใช้คำสั่งได้หมด
-OWNER_USER_ID = ""
+OWNER_USER_ID = os.environ.get("OWNER_USER_ID", "")
 
 PLACEHOLDER_TOKENS = {"", "ใส่_channel_access_token_ตรงนี้", "ใส่_channel_secret_ตรงนี้"}
 # ⚠️ อย่าใส่ token/secret จริงลงในเซ็ตนี้ ไม่งั้นโปรแกรมจะคิดว่ามันเป็น placeholder แล้วปฏิเสธไม่รัน
@@ -49,7 +43,7 @@ PLACEHOLDER_TOKENS = {"", "ใส่_channel_access_token_ตรงนี้", "
 CACHE_FILE = "rcode.json"
 SOURCE_XLSX_URL = "https://stat.bora.dopa.go.th/dload/rcode.xlsx"
 SOURCE_PAGE_URL = "https://stat.bora.dopa.go.th/stat/statnew/statMenu/newStat/ccaa.php"
-APP_VERSION = "1.0.0-line"
+APP_VERSION = "1.1.0-line"
 
 # ============================================================
 # RCODE LOADER  (เหมือนเวอร์ชัน Discord ทุกอย่าง)
@@ -272,29 +266,32 @@ def fetch_rcode_from_web() -> Optional[Dict]:
     return None
 
 
+PROVINCES = {
+    "10": "กรุงเทพมหานคร", "11": "สมุทรปราการ", "12": "นนทบุรี", "13": "ปทุมธานี",
+    "14": "พระนครศรีอยุธยา", "15": "อ่างทอง", "16": "ลพบุรี", "17": "สิงห์บุรี",
+    "18": "ชัยนาท", "19": "สระบุรี", "20": "ชลบุรี", "21": "ระยอง",
+    "22": "จันทบุรี", "23": "ตราด", "24": "ฉะเชิงเทรา", "25": "ปราจีนบุรี",
+    "26": "นครนายก", "27": "สระแก้ว", "30": "นครราชสีมา", "31": "บุรีรัมย์",
+    "32": "สุรินทร์", "33": "ศรีสะเกษ", "34": "อุบลราชธานี", "35": "ยโสธร",
+    "36": "ชัยภูมิ", "37": "อำนาจเจริญ", "38": "บึงกาฬ", "39": "หนองบัวลำภู",
+    "40": "ขอนแก่น", "41": "อุดรธานี", "42": "เลย", "43": "หนองคาย",
+    "44": "มหาสารคาม", "45": "ร้อยเอ็ด", "46": "กาฬสินธุ์", "47": "สกลนคร",
+    "48": "นครพนม", "49": "มุกดาหาร", "50": "เชียงใหม่", "51": "ลำพูน",
+    "52": "ลำปาง", "53": "อุตรดิตถ์", "54": "แพร่", "55": "น่าน",
+    "56": "พะเยา", "57": "เชียงราย", "58": "แม่ฮ่องสอน", "60": "นครสวรรค์",
+    "61": "อุทัยธานี", "62": "กำแพงเพชร", "63": "ตาก", "64": "สุโขทัย",
+    "65": "พิษณุโลก", "66": "พิจิตร", "67": "เพชรบูรณ์", "70": "ราชบุรี",
+    "71": "กาญจนบุรี", "72": "สุพรรณบุรี", "73": "นครปฐม", "74": "สมุทรสาคร",
+    "75": "สมุทรสงคราม", "76": "เพชรบุรี", "77": "ประจวบคีรีขันธ์",
+    "80": "นครศรีธรรมราช", "81": "กระบี่", "82": "พังงา", "83": "ภูเก็ต",
+    "84": "สุราษฎร์ธานี", "85": "ระนอง", "86": "ชุมพร", "90": "สงขลา",
+    "91": "สตูล", "92": "ตรัง", "93": "พัทลุง", "94": "ปัตตานี",
+    "95": "ยะลา", "96": "นราธิวาส",
+}
+
+
 def create_fallback_data() -> Dict:
-    provinces = {
-        "10": "กรุงเทพมหานคร", "11": "สมุทรปราการ", "12": "นนทบุรี", "13": "ปทุมธานี",
-        "14": "พระนครศรีอยุธยา", "15": "อ่างทอง", "16": "ลพบุรี", "17": "สิงห์บุรี",
-        "18": "ชัยนาท", "19": "สระบุรี", "20": "ชลบุรี", "21": "ระยอง",
-        "22": "จันทบุรี", "23": "ตราด", "24": "ฉะเชิงเทรา", "25": "ปราจีนบุรี",
-        "26": "นครนายก", "27": "สระแก้ว", "30": "นครราชสีมา", "31": "บุรีรัมย์",
-        "32": "สุรินทร์", "33": "ศรีสะเกษ", "34": "อุบลราชธานี", "35": "ยโสธร",
-        "36": "ชัยภูมิ", "37": "อำนาจเจริญ", "38": "บึงกาฬ", "39": "หนองบัวลำภู",
-        "40": "ขอนแก่น", "41": "อุดรธานี", "42": "เลย", "43": "หนองคาย",
-        "44": "มหาสารคาม", "45": "ร้อยเอ็ด", "46": "กาฬสินธุ์", "47": "สกลนคร",
-        "48": "นครพนม", "49": "มุกดาหาร", "50": "เชียงใหม่", "51": "ลำพูน",
-        "52": "ลำปาง", "53": "อุตรดิตถ์", "54": "แพร่", "55": "น่าน",
-        "56": "พะเยา", "57": "เชียงราย", "58": "แม่ฮ่องสอน", "60": "นครสวรรค์",
-        "61": "อุทัยธานี", "62": "กำแพงเพชร", "63": "ตาก", "64": "สุโขทัย",
-        "65": "พิษณุโลก", "66": "พิจิตร", "67": "เพชรบูรณ์", "70": "ราชบุรี",
-        "71": "กาญจนบุรี", "72": "สุพรรณบุรี", "73": "นครปฐม", "74": "สมุทรสาคร",
-        "75": "สมุทรสงคราม", "76": "เพชรบุรี", "77": "ประจวบคีรีขันธ์",
-        "80": "นครศรีธรรมราช", "81": "กระบี่", "82": "พังงา", "83": "ภูเก็ต",
-        "84": "สุราษฎร์ธานี", "85": "ระนอง", "86": "ชุมพร", "90": "สงขลา",
-        "91": "สตูล", "92": "ตรัง", "93": "พัทลุง", "94": "ปัตตานี",
-        "95": "ยะลา", "96": "นราธิวาส",
-    }
+    provinces = PROVINCES
     registries = {}
     for code, name in provinces.items():
         registries[code + "00"] = {
@@ -331,6 +328,9 @@ def init_rcode():
         return
     print("[RCODE] ใช้ fallback")
     RCODE_DB = create_fallback_data()
+
+
+init_rcode()  # เรียกตอนโหลดโมดูล เพื่อให้ทำงานได้ทั้งตอนรันด้วย gunicorn และ python ตรง ๆ
 
 
 # ============================================================
@@ -376,6 +376,19 @@ def calculate_checksum(pid: str) -> Dict:
     return {"actual": actual, "expected": expected, "valid": actual == expected, "total": total, "remainder": remainder}
 
 
+REGIONS = {
+    "1": "ภาคกลาง (กรุงเทพฯ และปริมณฑล)",
+    "2": "ภาคตะวันออก",
+    "3": "ภาคตะวันออกเฉียงเหนือ (ตอนล่าง)",
+    "4": "ภาคตะวันออกเฉียงเหนือ (ตอนบน)",
+    "5": "ภาคเหนือ",
+    "6": "ภาคเหนือตอนล่าง / กลางตอนบน",
+    "7": "ภาคตะวันตก",
+    "8": "ภาคใต้ (ตอนบน)",
+    "9": "ภาคใต้ (ตอนล่าง)",
+}
+
+
 def decode_id(raw: str) -> Dict:
     try:
         pid = normalize_id(raw)
@@ -386,7 +399,15 @@ def decode_id(raw: str) -> Dict:
     person_type = PERSON_TYPES.get(p_type, {"title": "ไม่ทราบประเภท", "detail": "-", "usage": "-"})
     rcode = pid[1:5]
     reg = RCODE_DB.get("registries", {}).get(rcode, {})
+    prov_code = pid[1:3]
+    location = {
+        "province_code": prov_code,
+        "province_name": PROVINCES.get(prov_code),
+        "district_code": pid[3:5],
+        "region": REGIONS.get(prov_code[0], "ไม่ทราบ"),
+    }
     return {
+        "location": location,
         "formatted": format_id(pid),
         "valid": checksum["valid"],
         "person_type": {"code": p_type, **person_type},
@@ -404,7 +425,7 @@ def decode_id(raw: str) -> Dict:
     }
 
 
-def build_reply_text(result: Dict) -> str:
+def build_reply_text(result: Dict, name: Optional[str] = None) -> str:
     """ประกอบผลลัพธ์เป็นข้อความธรรมดา (LINE text message ไม่มี embed แบบ Discord)"""
     if result.get("error"):
         return f"❌ {result['error']}"
@@ -416,8 +437,11 @@ def build_reply_text(result: Dict) -> str:
     serial = result["serial"]
     checksum = result["checksum"]
 
-    lines = [
-        "🏛️ Thai ID Decoder",
+    lines = ["🏛️ Thai ID Decoder"]
+    if name:
+        lines.append(f"ชื่อ-สกุล: {name}")
+        lines.append("(ชื่อตามที่ผู้ใช้พิมพ์ ไม่ได้ตรวจกับฐานข้อมูลทะเบียนราษฎร์)")
+    lines += [
         f"เลขบัตร: {result['formatted']}",
         f"สถานะ: {status_line}",
         f"Checksum: หลักสุดท้าย {checksum['actual']} / ควรเป็น {checksum['expected']}",
@@ -441,6 +465,17 @@ def build_reply_text(result: Dict) -> str:
     else:
         lines += [f"🏛️ รหัส RCODE: {reg['code']} — ไม่พบข้อมูลในฐานข้อมูล"]
 
+    loc = result["location"]
+    prov_text = loc["province_name"] or "ไม่พบรหัสจังหวัดนี้"
+    lines += [
+        "",
+        "📍 พื้นที่ที่ออกเลข (จากหลักที่ 2-5)",
+        f"จังหวัด: {prov_text} (รหัส {loc['province_code']})",
+        f"รหัสอำเภอ/เขต: {loc['district_code']}",
+        f"ภูมิภาค: {loc['region']}",
+        "* เป็นที่สำนักทะเบียนที่ออกเลขให้ ไม่ได้แปลว่าเป็นที่อยู่ปัจจุบัน",
+    ]
+
     lines += ["", f"📂 กลุ่มทะเบียน: {serial['group']} | ลำดับในกลุ่ม: {serial['sequence']}"]
 
     reg_meta = RCODE_DB.get("metadata", {})
@@ -451,9 +486,13 @@ def build_reply_text(result: Dict) -> str:
 
 HELP_TEXT = (
     "📖 วิธีใช้\n"
-    "พิมพ์: !id <เลขบัตรประชาชน 13 หลัก>\n"
-    "ตัวอย่าง: !id 1234567890123\n"
+    "พิมพ์: !id <เลขบัตร 13 หลัก> [ชื่อ นามสกุล]\n"
+    "ตัวอย่าง:\n"
+    "!id 1234567890123\n"
+    "!id 1234567890123 สมชาย ใจดี\n"
+    "1-2345-67890-12-3 สมชาย ใจดี\n"
     "หรือพิมพ์เลข 13 หลักตรง ๆ ก็ได้\n\n"
+    "• ชื่อที่พิมพ์จะแสดงตามที่ใส่เท่านั้น บอทไม่ค้นชื่อจากเลขบัตร\n"
     "• ตรวจ Checksum ตามอัลกอริทึมกระทรวงมหาดไทย\n"
     "• ถอดรหัสสำนักทะเบียน (RCODE) จากฐาน DOPA"
 )
@@ -462,19 +501,35 @@ HELP_TEXT = (
 # LINE BOT (Flask webhook)
 # ============================================================
 
+if LINE_CHANNEL_ACCESS_TOKEN in PLACEHOLDER_TOKENS or LINE_CHANNEL_SECRET in PLACEHOLDER_TOKENS:
+    print("⚠️ ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET ใน Environment")
+
 app = Flask(__name__)
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 
-def extract_id_query(text: str) -> Optional[str]:
-    """รองรับทั้ง '!id 1234567890123' และพิมพ์เลข 13 หลักตรง ๆ"""
+ID_PATTERN = re.compile(r"(?<!\d)\d[\s-]?\d{4}[\s-]?\d{5}[\s-]?\d{2}[\s-]?\d(?!\d)")
+MAX_NAME_LEN = 80
+
+
+def extract_id_query(text: str):
+    """คืนค่า (เลขบัตร, ชื่อ) หรือ None ถ้าข้อความไม่เกี่ยวข้อง
+    รองรับ: '!id 1234567890123', '!id 1234567890123 สมชาย ใจดี',
+            '1-2345-67890-12-3 สมชาย ใจดี', หรือเลข 13 หลักตรง ๆ"""
     text = text.strip()
-    if text.startswith("!id"):
-        return text[3:].strip()
-    digits_only = re.sub(r"[^\d]", "", text)
-    if len(digits_only) == 13:
-        return digits_only
+    is_command = text.startswith("!id")
+    body = text[3:].strip() if is_command else text
+
+    m = ID_PATTERN.search(body)
+    if m:
+        pid = re.sub(r"\D", "", m.group(0))
+        name = (body[:m.start()] + " " + body[m.end():])
+        name = re.sub(r"\s+", " ", name).strip()[:MAX_NAME_LEN]
+        return pid, (name or None)
+
+    if is_command:
+        return body, None  # ให้ decode_id แจ้ง error เช่น ได้ไม่ครบ 13 หลัก
     return None
 
 
@@ -494,7 +549,8 @@ def callback():
 def handle_message(event: MessageEvent):
     user_text = event.message.text or ""
     user_id = event.source.user_id if event.source else None
-    print(f"[LINE] from={user_id} text={user_text!r}")
+    # ไม่ log เนื้อหาข้อความ เพราะมีเลขบัตร/ชื่อ (ข้อมูลส่วนบุคคล)
+    print(f"[LINE] from={user_id} len={len(user_text)}")
 
     if OWNER_USER_ID and user_id != OWNER_USER_ID:
         return  # เงียบไว้ ไม่ตอบถ้าไม่ใช่เจ้าของ (ล็อคไว้)
@@ -505,8 +561,9 @@ def handle_message(event: MessageEvent):
         query = extract_id_query(user_text)
         if query is None:
             return  # ไม่ใช่คำสั่งที่เกี่ยวข้อง ไม่ต้องตอบ
-        result = decode_id(query)
-        reply_text = build_reply_text(result)
+        pid, name = query
+        result = decode_id(pid)
+        reply_text = build_reply_text(result, name)
 
     try:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
@@ -528,7 +585,6 @@ def main():
     if LINE_CHANNEL_ACCESS_TOKEN in PLACEHOLDER_TOKENS or LINE_CHANNEL_SECRET in PLACEHOLDER_TOKENS:
         print("❌ ยังไม่ได้ใส่ LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET (หรือตั้งผ่าน env var)")
         return
-    init_rcode()
     print("=" * 60)
     print(f"[BOT] Thai ID Decoder (LINE) v{APP_VERSION}")
     print(f"[BOT] Owner lock: {OWNER_USER_ID or 'OFF'}")
