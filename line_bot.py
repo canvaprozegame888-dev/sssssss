@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Thai ID Decoder — LINE Bot Edition
+Thai ID Decoder - LINE Bot Edition (รูปแบบทางการ)
 พิมพ์ "!id <เลขบัตร>" หรือพิมพ์เลขบัตร 13 หลักตรง ๆ ในแชทกับ LINE Official Account
 รันด้วย Flask รับ webhook จาก LINE Messaging API
 """
@@ -24,18 +24,22 @@ from linebot.exceptions import InvalidSignatureError, LineBotApiError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
 # ============================================================
-# ⚙️ CONFIGURATION (แก้ตรงนี้ หรือจะตั้งผ่าน environment variable ก็ได้)
+# CONFIGURATION
+# ตั้งค่าผ่าน environment variable (แนะนำ) หรือแก้ค่าในเครื่องหมายคำพูดด้านล่าง
 # ============================================================
 
-LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
-LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "")
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get(
+    "LINE_CHANNEL_ACCESS_TOKEN", "ใส่_channel_access_token_ตรงนี้"
+)
+LINE_CHANNEL_SECRET = os.environ.get(
+    "LINE_CHANNEL_SECRET", "ใส่_channel_secret_ตรงนี้"
+)
 
-# ถ้าอยากจำกัดให้ใช้ได้เฉพาะ LINE user ID ของคุณ ใส่ user id ตรงนี้ (หาได้จาก event.source.user_id ที่ print ตอนทดสอบ)
-# ปล่อยเป็นสตริงว่าง "" = ไม่ล็อค ใครทักมาก็ใช้คำสั่งได้หมด
+# จำกัดให้ใช้ได้เฉพาะ LINE user ID ของคุณ (ดูได้จาก log "[LINE] from=...")
+# ปล่อยเป็น "" = ไม่ล็อค ใครทักมาก็ใช้คำสั่งได้
 OWNER_USER_ID = os.environ.get("OWNER_USER_ID", "")
 
 PLACEHOLDER_TOKENS = {"", "ใส่_channel_access_token_ตรงนี้", "ใส่_channel_secret_ตรงนี้"}
-# ⚠️ อย่าใส่ token/secret จริงลงในเซ็ตนี้ ไม่งั้นโปรแกรมจะคิดว่ามันเป็น placeholder แล้วปฏิเสธไม่รัน
 
 # ============================================================
 # CONSTANTS
@@ -45,8 +49,31 @@ SOURCE_XLSX_URL = "https://stat.bora.dopa.go.th/dload/rcode.xlsx"
 SOURCE_PAGE_URL = "https://stat.bora.dopa.go.th/stat/statnew/statMenu/newStat/ccaa.php"
 APP_VERSION = "1.1.0-line"
 
+PROVINCES = {
+    "10": "กรุงเทพมหานคร", "11": "สมุทรปราการ", "12": "นนทบุรี", "13": "ปทุมธานี",
+    "14": "พระนครศรีอยุธยา", "15": "อ่างทอง", "16": "ลพบุรี", "17": "สิงห์บุรี",
+    "18": "ชัยนาท", "19": "สระบุรี", "20": "ชลบุรี", "21": "ระยอง",
+    "22": "จันทบุรี", "23": "ตราด", "24": "ฉะเชิงเทรา", "25": "ปราจีนบุรี",
+    "26": "นครนายก", "27": "สระแก้ว", "30": "นครราชสีมา", "31": "บุรีรัมย์",
+    "32": "สุรินทร์", "33": "ศรีสะเกษ", "34": "อุบลราชธานี", "35": "ยโสธร",
+    "36": "ชัยภูมิ", "37": "อำนาจเจริญ", "38": "บึงกาฬ", "39": "หนองบัวลำภู",
+    "40": "ขอนแก่น", "41": "อุดรธานี", "42": "เลย", "43": "หนองคาย",
+    "44": "มหาสารคาม", "45": "ร้อยเอ็ด", "46": "กาฬสินธุ์", "47": "สกลนคร",
+    "48": "นครพนม", "49": "มุกดาหาร", "50": "เชียงใหม่", "51": "ลำพูน",
+    "52": "ลำปาง", "53": "อุตรดิตถ์", "54": "แพร่", "55": "น่าน",
+    "56": "พะเยา", "57": "เชียงราย", "58": "แม่ฮ่องสอน", "60": "นครสวรรค์",
+    "61": "อุทัยธานี", "62": "กำแพงเพชร", "63": "ตาก", "64": "สุโขทัย",
+    "65": "พิษณุโลก", "66": "พิจิตร", "67": "เพชรบูรณ์", "70": "ราชบุรี",
+    "71": "กาญจนบุรี", "72": "สุพรรณบุรี", "73": "นครปฐม", "74": "สมุทรสาคร",
+    "75": "สมุทรสงคราม", "76": "เพชรบุรี", "77": "ประจวบคีรีขันธ์",
+    "80": "นครศรีธรรมราช", "81": "กระบี่", "82": "พังงา", "83": "ภูเก็ต",
+    "84": "สุราษฎร์ธานี", "85": "ระนอง", "86": "ชุมพร", "90": "สงขลา",
+    "91": "สตูล", "92": "ตรัง", "93": "พัทลุง", "94": "ปัตตานี",
+    "95": "ยะลา", "96": "นราธิวาส",
+}
+
 # ============================================================
-# RCODE LOADER  (เหมือนเวอร์ชัน Discord ทุกอย่าง)
+# RCODE LOADER
 # ============================================================
 
 def load_rcode_cache() -> Optional[Dict]:
@@ -266,34 +293,9 @@ def fetch_rcode_from_web() -> Optional[Dict]:
     return None
 
 
-PROVINCES = {
-    "10": "กรุงเทพมหานคร", "11": "สมุทรปราการ", "12": "นนทบุรี", "13": "ปทุมธานี",
-    "14": "พระนครศรีอยุธยา", "15": "อ่างทอง", "16": "ลพบุรี", "17": "สิงห์บุรี",
-    "18": "ชัยนาท", "19": "สระบุรี", "20": "ชลบุรี", "21": "ระยอง",
-    "22": "จันทบุรี", "23": "ตราด", "24": "ฉะเชิงเทรา", "25": "ปราจีนบุรี",
-    "26": "นครนายก", "27": "สระแก้ว", "30": "นครราชสีมา", "31": "บุรีรัมย์",
-    "32": "สุรินทร์", "33": "ศรีสะเกษ", "34": "อุบลราชธานี", "35": "ยโสธร",
-    "36": "ชัยภูมิ", "37": "อำนาจเจริญ", "38": "บึงกาฬ", "39": "หนองบัวลำภู",
-    "40": "ขอนแก่น", "41": "อุดรธานี", "42": "เลย", "43": "หนองคาย",
-    "44": "มหาสารคาม", "45": "ร้อยเอ็ด", "46": "กาฬสินธุ์", "47": "สกลนคร",
-    "48": "นครพนม", "49": "มุกดาหาร", "50": "เชียงใหม่", "51": "ลำพูน",
-    "52": "ลำปาง", "53": "อุตรดิตถ์", "54": "แพร่", "55": "น่าน",
-    "56": "พะเยา", "57": "เชียงราย", "58": "แม่ฮ่องสอน", "60": "นครสวรรค์",
-    "61": "อุทัยธานี", "62": "กำแพงเพชร", "63": "ตาก", "64": "สุโขทัย",
-    "65": "พิษณุโลก", "66": "พิจิตร", "67": "เพชรบูรณ์", "70": "ราชบุรี",
-    "71": "กาญจนบุรี", "72": "สุพรรณบุรี", "73": "นครปฐม", "74": "สมุทรสาคร",
-    "75": "สมุทรสงคราม", "76": "เพชรบุรี", "77": "ประจวบคีรีขันธ์",
-    "80": "นครศรีธรรมราช", "81": "กระบี่", "82": "พังงา", "83": "ภูเก็ต",
-    "84": "สุราษฎร์ธานี", "85": "ระนอง", "86": "ชุมพร", "90": "สงขลา",
-    "91": "สตูล", "92": "ตรัง", "93": "พัทลุง", "94": "ปัตตานี",
-    "95": "ยะลา", "96": "นราธิวาส",
-}
-
-
 def create_fallback_data() -> Dict:
-    provinces = PROVINCES
     registries = {}
-    for code, name in provinces.items():
+    for code, name in PROVINCES.items():
         registries[code + "00"] = {
             "name": f"จังหวัด{name}",
             "subdistrict": name,
@@ -330,11 +332,8 @@ def init_rcode():
     RCODE_DB = create_fallback_data()
 
 
-init_rcode()  # เรียกตอนโหลดโมดูล เพื่อให้ทำงานได้ทั้งตอนรันด้วย gunicorn และ python ตรง ๆ
-
-
 # ============================================================
-# ID DECODER  (เหมือนเวอร์ชัน Discord ทุกอย่าง)
+# ID DECODER
 # ============================================================
 
 PERSON_TYPES = {
@@ -354,9 +353,9 @@ PERSON_TYPES = {
 def normalize_id(raw: str) -> str:
     value = re.sub(r"[^\d]", "", raw.strip())
     if not value:
-        raise ValueError("ไม่ได้กรอกเลขบัตร")
+        raise ValueError("ไม่ได้กรอกเลขประจำตัวประชาชน")
     if len(value) != 13:
-        raise ValueError(f"เลขบัตรต้องมี 13 หลัก (ได้ {len(value)} หลัก)")
+        raise ValueError(f"เลขประจำตัวประชาชนต้องมี 13 หลัก (ได้รับ {len(value)} หลัก)")
     return value
 
 
@@ -364,29 +363,34 @@ def format_id(pid: str) -> str:
     return f"{pid[0]}-{pid[1:5]}-{pid[5:10]}-{pid[10:12]}-{pid[12]}"
 
 
+def mask_id(pid: str) -> str:
+    """ปิดบังเลขบัตรใน log (แสดงเฉพาะ 4 หลักท้าย)"""
+    digits = re.sub(r"[^\d]", "", pid)
+    if len(digits) >= 4:
+        return "*" * (len(digits) - 4) + digits[-4:]
+    return "***"
+
+
 def calculate_checksum(pid: str) -> Dict:
     total = 0
+    terms = []
     for i, ch in enumerate(pid[:12]):
         digit = int(ch)
         weight = 13 - i
-        total += digit * weight
+        product = digit * weight
+        total += product
+        terms.append({"position": i + 1, "digit": digit, "weight": weight, "product": product})
     remainder = total % 11
     expected = (11 - remainder) % 10
     actual = int(pid[12])
-    return {"actual": actual, "expected": expected, "valid": actual == expected, "total": total, "remainder": remainder}
-
-
-REGIONS = {
-    "1": "ภาคกลาง (กรุงเทพฯ และปริมณฑล)",
-    "2": "ภาคตะวันออก",
-    "3": "ภาคตะวันออกเฉียงเหนือ (ตอนล่าง)",
-    "4": "ภาคตะวันออกเฉียงเหนือ (ตอนบน)",
-    "5": "ภาคเหนือ",
-    "6": "ภาคเหนือตอนล่าง / กลางตอนบน",
-    "7": "ภาคตะวันตก",
-    "8": "ภาคใต้ (ตอนบน)",
-    "9": "ภาคใต้ (ตอนล่าง)",
-}
+    return {
+        "actual": actual,
+        "expected": expected,
+        "valid": actual == expected,
+        "total": total,
+        "remainder": remainder,
+        "terms": terms,
+    }
 
 
 def decode_id(raw: str) -> Dict:
@@ -394,142 +398,191 @@ def decode_id(raw: str) -> Dict:
         pid = normalize_id(raw)
     except ValueError as e:
         return {"error": str(e)}
+
     checksum = calculate_checksum(pid)
     p_type = int(pid[0])
     person_type = PERSON_TYPES.get(p_type, {"title": "ไม่ทราบประเภท", "detail": "-", "usage": "-"})
+
     rcode = pid[1:5]
-    reg = RCODE_DB.get("registries", {}).get(rcode, {})
     prov_code = pid[1:3]
-    location = {
-        "province_code": prov_code,
-        "province_name": PROVINCES.get(prov_code),
-        "district_code": pid[3:5],
-        "region": REGIONS.get(prov_code[0], "ไม่ทราบ"),
-    }
+    amp_code = pid[3:5]
+    registries = RCODE_DB.get("registries", {})
+    reg = registries.get(rcode, {})
+
+    # ชื่อจังหวัด: ใช้จากสำนักทะเบียนก่อน ถ้าไม่มีให้ใช้จากรหัสจังหวัด 2 หลักแรก
+    prov_rec = registries.get(prov_code + "00", {})
+    province_name = (
+        reg.get("province")
+        or prov_rec.get("province")
+        or PROVINCES.get(prov_code)
+        or "ไม่พบข้อมูล"
+    )
+
     return {
-        "location": location,
+        "raw": pid,
         "formatted": format_id(pid),
         "valid": checksum["valid"],
         "person_type": {"code": p_type, **person_type},
         "registry": {
             "code": rcode,
+            "found": bool(reg),
+            "province_code": prov_code,
+            "amphoe_code": amp_code,
             "name": reg.get("name", "ไม่พบข้อมูล"),
             "subdistrict": reg.get("subdistrict", "ไม่พบข้อมูล"),
             "district": reg.get("district", "ไม่พบข้อมูล"),
-            "province": reg.get("province", "ไม่พบข้อมูล"),
-            "type": reg.get("type", "สำนักทะเบียน"),
+            "province": province_name,
+            "type": reg.get("type", "ไม่พบข้อมูล"),
             "status": reg.get("status", "ไม่ทราบ"),
         },
-        "serial": {"group": pid[5:10], "sequence": pid[10:12]},
+        "serial": {"group": pid[5:10], "sequence": pid[10:12], "combined": pid[5:12]},
         "checksum": checksum,
     }
 
 
-def build_reply_text(result: Dict, name: Optional[str] = None) -> str:
-    """ประกอบผลลัพธ์เป็นข้อความธรรมดา (LINE text message ไม่มี embed แบบ Discord)"""
-    if result.get("error"):
-        return f"❌ {result['error']}"
+# ============================================================
+# REPLY BUILDER (รูปแบบทางการ / ใช้เครื่องหมายแทนอิโมจิ)
+# ============================================================
 
-    valid = result["valid"]
-    status_line = "✅ ผ่านการตรวจสอบ" if valid else "❌ ไม่ผ่าน Checksum"
+SEP_MAJOR = "══════════════════════"
+SEP_MINOR = "──────────────────────"
+
+
+def build_reply_text(result: Dict) -> str:
+    if result.get("error"):
+        return "\n".join([
+            "รายงานผลการตรวจสอบเลขประจำตัวประชาชน",
+            SEP_MAJOR,
+            f"[ข้อผิดพลาด] {result['error']}",
+            "",
+            "กรุณาระบุเลขประจำตัวประชาชน 13 หลัก",
+            "ตัวอย่าง: !id 1234567890123",
+        ])
+
+    pid = result["raw"]
     pt = result["person_type"]
     reg = result["registry"]
     serial = result["serial"]
-    checksum = result["checksum"]
+    cs = result["checksum"]
+    valid = result["valid"]
 
-    lines = ["🏛️ Thai ID Decoder"]
-    if name:
-        lines.append(f"ชื่อ-สกุล: {name}")
-        lines.append("(ชื่อตามที่ผู้ใช้พิมพ์ ไม่ได้ตรวจกับฐานข้อมูลทะเบียนราษฎร์)")
-    lines += [
-        f"เลขบัตร: {result['formatted']}",
-        f"สถานะ: {status_line}",
-        f"Checksum: หลักสุดท้าย {checksum['actual']} / ควรเป็น {checksum['expected']}",
+    verdict = "[ผ่าน] เลขหลักตรวจสอบถูกต้องตามอัลกอริทึม" if valid else "[ไม่ผ่าน] เลขหลักตรวจสอบไม่ถูกต้อง"
+    calc_expr = " + ".join(f"{t['digit']}×{t['weight']}" for t in cs["terms"])
+
+    lines = [
+        "รายงานผลการตรวจสอบเลขประจำตัวประชาชน",
+        SEP_MAJOR,
+        f"เลขประจำตัวประชาชน : {result['formatted']}",
+        f"ผลการตรวจสอบ       : {verdict}",
+        SEP_MAJOR,
         "",
-        f"👤 ประเภทบุคคล (หลัก 1: {pt['code']})",
-        f"{pt['title']}",
-        f"{pt['detail']}",
+        "■ ส่วนที่ 1  การตรวจสอบเลขหลักที่ 13 (Checksum)",
+        SEP_MINOR,
+        f"▪ เลขหลักที่ 13 ตามที่ระบุ   : {cs['actual']}",
+        f"▪ เลขหลักที่ 13 ที่คำนวณได้  : {cs['expected']}",
+        f"▪ ผลรวมถ่วงน้ำหนัก (หลักที่ 1-12) : {cs['total']}",
+        f"▪ เศษจากการหารด้วย 11        : {cs['remainder']}",
+        "▪ สูตรคำนวณ : (11 - เศษ) mod 10",
+        f"▪ รายละเอียด : {calc_expr} = {cs['total']}",
+        f"▪ สรุป : {'ตรงกัน' if valid else 'ไม่ตรงกัน'} ({cs['actual']} {'=' if valid else '≠'} {cs['expected']})",
+        "",
+        f"■ ส่วนที่ 2  ประเภทบุคคล (หลักที่ 1 = {pt['code']})",
+        SEP_MINOR,
+        f"▪ ประเภท       : {pt['title']}",
+        f"▪ รายละเอียด   : {pt['detail']}",
+        f"▪ การใช้งาน    : {pt['usage']}",
+        "",
+        f"■ ส่วนที่ 3  สำนักทะเบียนที่ออกเลข (หลักที่ 2-5 = {reg['code']})",
+        SEP_MINOR,
+        f"▪ รหัสจังหวัด (หลักที่ 2-3)  : {reg['province_code']}",
+        f"▪ รหัสอำเภอ/เขต (หลักที่ 4-5) : {reg['amphoe_code']}",
+        f"▪ จังหวัด      : {reg['province']}",
     ]
 
-    lines.append("")
-    if reg["name"] != "ไม่พบข้อมูล":
+    if reg["found"]:
         lines += [
-            "🏛️ สำนักทะเบียน",
-            f"รหัส RCODE: {reg['code']}",
-            f"ชื่อ: {reg['name']}",
-            f"ประเภท: {reg['type']} | สถานะ: {reg['status']}",
-            f"ตำบล/แขวง: {reg['subdistrict']}",
-            f"อำเภอ/เขต: {reg['district']}",
-            f"จังหวัด: {reg['province']}",
+            f"▪ สำนักทะเบียน : {reg['name']}",
+            f"▪ ประเภทสำนักงาน : {reg['type']}",
+            f"▪ อำเภอ/เขต    : {reg['district']}",
+            f"▪ ตำบล/แขวง    : {reg['subdistrict']}",
+            f"▪ สถานะสำนักทะเบียน : {reg['status']}",
         ]
     else:
-        lines += [f"🏛️ รหัส RCODE: {reg['code']} — ไม่พบข้อมูลในฐานข้อมูล"]
+        lines += [
+            "▪ สำนักทะเบียน : ไม่พบข้อมูลรหัสนี้ในฐานข้อมูล RCODE",
+        ]
 
-    loc = result["location"]
-    prov_text = loc["province_name"] or "ไม่พบรหัสจังหวัดนี้"
     lines += [
         "",
-        "📍 พื้นที่ที่ออกเลข (จากหลักที่ 2-5)",
-        f"จังหวัด: {prov_text} (รหัส {loc['province_code']})",
-        f"รหัสอำเภอ/เขต: {loc['district_code']}",
-        f"ภูมิภาค: {loc['region']}",
-        "* เป็นที่สำนักทะเบียนที่ออกเลขให้ ไม่ได้แปลว่าเป็นที่อยู่ปัจจุบัน",
+        "■ ส่วนที่ 4  ลำดับการลงทะเบียน (หลักที่ 6-12)",
+        SEP_MINOR,
+        f"▪ กลุ่มทะเบียน (หลักที่ 6-10)  : {serial['group']}",
+        f"▪ ลำดับในกลุ่ม (หลักที่ 11-12) : {serial['sequence']}",
+        f"▪ เลขลำดับรวม (หลักที่ 6-12)   : {serial['combined']}",
+        "",
+        "■ ส่วนที่ 5  โครงสร้างเลข 13 หลัก",
+        SEP_MINOR,
+        f"▪ หลักที่ 1      [{pid[0]}]       ประเภทบุคคล",
+        f"▪ หลักที่ 2-5    [{pid[1:5]}]  รหัสสำนักทะเบียน (RCODE)",
+        f"▪ หลักที่ 6-10   [{pid[5:10]}] กลุ่มทะเบียน",
+        f"▪ หลักที่ 11-12  [{pid[10:12]}]    ลำดับในกลุ่ม",
+        f"▪ หลักที่ 13     [{pid[12]}]       หลักตรวจสอบ",
+        "",
+        "※ หมายเหตุ",
+        SEP_MINOR,
+        "1. ผลการตรวจสอบนี้เป็นการตรวจสอบโครงสร้างและเลขหลักตรวจสอบเท่านั้น",
+        "2. ไม่ยืนยันว่ามีเลขประจำตัวประชาชนนี้อยู่จริงในฐานข้อมูลทะเบียนราษฎร",
+        "3. ไม่ยืนยันตัวตนหรือความเป็นเจ้าของเลขดังกล่าว",
     ]
 
-    lines += ["", f"📂 กลุ่มทะเบียน: {serial['group']} | ลำดับในกลุ่ม: {serial['sequence']}"]
-
     reg_meta = RCODE_DB.get("metadata", {})
-    lines += ["", f"— v{APP_VERSION} | RCODE {reg_meta.get('record_count', '?')} รหัส"]
+    updated = str(reg_meta.get("updated_at", ""))[:10] or "-"
+    lines += [
+        "",
+        SEP_MAJOR,
+        f"ฐานข้อมูล RCODE : {reg_meta.get('record_count', '?')} รหัส (ปรับปรุงเมื่อ {updated})",
+        "แหล่งข้อมูล : กรมการปกครอง (DOPA)",
+        f"เวอร์ชันระบบ : v{APP_VERSION}",
+    ]
 
     return "\n".join(lines)
 
 
-HELP_TEXT = (
-    "📖 วิธีใช้\n"
-    "พิมพ์: !id <เลขบัตร 13 หลัก> [ชื่อ นามสกุล]\n"
-    "ตัวอย่าง:\n"
-    "!id 1234567890123\n"
-    "!id 1234567890123 สมชาย ใจดี\n"
-    "1-2345-67890-12-3 สมชาย ใจดี\n"
-    "หรือพิมพ์เลข 13 หลักตรง ๆ ก็ได้\n\n"
-    "• ชื่อที่พิมพ์จะแสดงตามที่ใส่เท่านั้น บอทไม่ค้นชื่อจากเลขบัตร\n"
-    "• ตรวจ Checksum ตามอัลกอริทึมกระทรวงมหาดไทย\n"
-    "• ถอดรหัสสำนักทะเบียน (RCODE) จากฐาน DOPA"
-)
+HELP_TEXT = "\n".join([
+    "คู่มือการใช้งาน",
+    SEP_MAJOR,
+    "■ วิธีใช้",
+    "▪ พิมพ์ : !id <เลขประจำตัวประชาชน 13 หลัก>",
+    "▪ ตัวอย่าง : !id 1234567890123",
+    "▪ หรือพิมพ์เลข 13 หลักโดยตรงก็ได้",
+    "",
+    "■ ข้อมูลที่ระบบแสดง",
+    "▪ ผลการตรวจสอบเลขหลักที่ 13 (Checksum) พร้อมรายละเอียดการคำนวณ",
+    "▪ ประเภทบุคคล (หลักที่ 1)",
+    "▪ สำนักทะเบียน จังหวัด อำเภอ/เขต (หลักที่ 2-5)",
+    "▪ กลุ่มทะเบียนและลำดับ (หลักที่ 6-12)",
+    "▪ โครงสร้างเลขทั้ง 13 หลัก",
+    "",
+    "※ ข้อมูลสำนักทะเบียนอ้างอิงจากฐานข้อมูล RCODE ของกรมการปกครอง",
+])
 
 # ============================================================
 # LINE BOT (Flask webhook)
 # ============================================================
-
-if LINE_CHANNEL_ACCESS_TOKEN in PLACEHOLDER_TOKENS or LINE_CHANNEL_SECRET in PLACEHOLDER_TOKENS:
-    print("⚠️ ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET ใน Environment")
 
 app = Flask(__name__)
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 
-ID_PATTERN = re.compile(r"(?<!\d)\d[\s-]?\d{4}[\s-]?\d{5}[\s-]?\d{2}[\s-]?\d(?!\d)")
-MAX_NAME_LEN = 80
-
-
-def extract_id_query(text: str):
-    """คืนค่า (เลขบัตร, ชื่อ) หรือ None ถ้าข้อความไม่เกี่ยวข้อง
-    รองรับ: '!id 1234567890123', '!id 1234567890123 สมชาย ใจดี',
-            '1-2345-67890-12-3 สมชาย ใจดี', หรือเลข 13 หลักตรง ๆ"""
+def extract_id_query(text: str) -> Optional[str]:
+    """รองรับทั้ง '!id 1234567890123' และพิมพ์เลข 13 หลักตรง ๆ"""
     text = text.strip()
-    is_command = text.startswith("!id")
-    body = text[3:].strip() if is_command else text
-
-    m = ID_PATTERN.search(body)
-    if m:
-        pid = re.sub(r"\D", "", m.group(0))
-        name = (body[:m.start()] + " " + body[m.end():])
-        name = re.sub(r"\s+", " ", name).strip()[:MAX_NAME_LEN]
-        return pid, (name or None)
-
-    if is_command:
-        return body, None  # ให้ decode_id แจ้ง error เช่น ได้ไม่ครบ 13 หลัก
+    if text.startswith("!id"):
+        return text[3:].strip()
+    digits_only = re.sub(r"[^\d]", "", text)
+    if len(digits_only) == 13:
+        return digits_only
     return None
 
 
@@ -540,7 +593,7 @@ def callback():
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
-        print("[LINE] Invalid signature — ตรวจ LINE_CHANNEL_SECRET")
+        print("[LINE] Invalid signature - ตรวจ LINE_CHANNEL_SECRET")
         abort(400)
     return "OK"
 
@@ -549,21 +602,19 @@ def callback():
 def handle_message(event: MessageEvent):
     user_text = event.message.text or ""
     user_id = event.source.user_id if event.source else None
-    # ไม่ log เนื้อหาข้อความ เพราะมีเลขบัตร/ชื่อ (ข้อมูลส่วนบุคคล)
-    print(f"[LINE] from={user_id} len={len(user_text)}")
+    print(f"[LINE] from={user_id} text={mask_id(user_text)!r}")
 
     if OWNER_USER_ID and user_id != OWNER_USER_ID:
-        return  # เงียบไว้ ไม่ตอบถ้าไม่ใช่เจ้าของ (ล็อคไว้)
+        return  # ล็อคไว้ ไม่ตอบถ้าไม่ใช่เจ้าของ
 
-    if user_text.strip() in ("!id", "!id "):
+    if user_text.strip() == "!id":
         reply_text = HELP_TEXT
     else:
         query = extract_id_query(user_text)
         if query is None:
             return  # ไม่ใช่คำสั่งที่เกี่ยวข้อง ไม่ต้องตอบ
-        pid, name = query
-        result = decode_id(pid)
-        reply_text = build_reply_text(result, name)
+        result = decode_id(query)
+        reply_text = build_reply_text(result)
 
     try:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
@@ -583,8 +634,9 @@ def health():
 
 def main():
     if LINE_CHANNEL_ACCESS_TOKEN in PLACEHOLDER_TOKENS or LINE_CHANNEL_SECRET in PLACEHOLDER_TOKENS:
-        print("❌ ยังไม่ได้ใส่ LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET (หรือตั้งผ่าน env var)")
+        print("[ERROR] ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET (ตั้งผ่าน env var)")
         return
+    init_rcode()
     print("=" * 60)
     print(f"[BOT] Thai ID Decoder (LINE) v{APP_VERSION}")
     print(f"[BOT] Owner lock: {OWNER_USER_ID or 'OFF'}")
